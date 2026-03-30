@@ -1,4 +1,4 @@
-# ECE4723_senior_design
+# ECE4723 Senior Design - Invisivisor
 
 How to SCP a file onto the raspberry pi: 
 ```bash
