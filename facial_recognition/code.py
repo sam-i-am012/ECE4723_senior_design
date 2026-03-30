@@ -1,10 +1,12 @@
+# Working code - shows bounding boxes around faces
 import cv2
 from picamera2 import Picamera2
 import time
 import numpy as np
 
 # 1. Load the pre-trained face cascade classifier
-face_cascade = cv2.CascadeClassifier('/home/ece4723inter/Documents/faceRecognition/haarcascade_frontalface_default.xml')
+face_cascade = cv2.CascadeClassifier('/home/ece4723inter/Documents/ECE4723_senior_design/facial_recognition/haarcascade_frontalface_default.xml')
+eye_cascade = cv2.CascadeClassifier('/home/ece4723inter/Documents/ECE4723_senior_design/facial_recognition/haarcascade_eye.xml')
 
 # 2. Initialize Picamera2
 picam2 = Picamera2()
@@ -28,11 +30,18 @@ try:
         gray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
         
         # Perform face detection
-        faces = face_cascade.detectMultiScale(gray, scaleFactor=1.3, minNeighbors=5, minSize=(30, 30))
+        faces = face_cascade.detectMultiScale(gray, 1.1, 4)
         
         for (x, y, w, h) in faces:
             # Draw rectangle around detected faces
-            cv2.rectangle(frame, (x, y), (x+w, y+h), (0, 255, 0), 2)
+            cv2.rectangle(frame, (x, y), (x+w, y+h), (255, 0, 0), 2)
+            
+            roi_gray = gray[y:y+h, x:x+w]
+            
+            eyes = eye_cascade.detectMultiScale(roi_gray)
+                
+            for (ex, ey, ew, eh) in eyes:
+                cv2.rectangle(frame, (x+ex, y+ey), (x+ex+ew, y+ey+eh), (0, 255, 0), 2)
             
             # Compare detected face with reference (Simple Template Matching)
             if face_reference is not None:
@@ -45,7 +54,12 @@ try:
                 
                 if max_val >= 0.8:
                     cv2.putText(frame, "Match Found", (x, y-10), cv2.FONT_HERSHEY_SIMPLEX, 0.9, (0, 255, 0), 2)
-        
+                
+                eyes = eye_cascade.detectMultiScale(roi_gray)
+                
+                for (ex, ey, ew, eh) in eyes:
+                    cv2.rectangle(roi_color, (ex, ey), (ex+ew, ey+eh), (0, 255, 0), 2)
+                    
         # Display the resulting frame
         cv2.imshow("Face Recognition", frame)
         
