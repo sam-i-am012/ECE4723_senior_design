@@ -8,7 +8,7 @@ class InvisiVisorSim:
         # self.root.overrideredirect(True) # remove window borders and title bar
 
         # for second monitor 
-        # self.root.geometry(f"{monitor_width}x{monitor_height}+{laptop_width}+{laptop_height}") # set the window size and position adjusted for monitor set up 
+        self.root.geometry(f"{monitor_width}x{monitor_height}+{laptop_width}+{laptop_height}") # set the window size and position adjusted for monitor set up 
         
         self.root.attributes('-fullscreen', True) # full screen
         
