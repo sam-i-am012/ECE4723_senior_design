@@ -30,15 +30,16 @@ try:
         gray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
         
         # Perform face detection
-        faces = face_cascade.detectMultiScale(gray, 1.1, 4)
+        faces = face_cascade.detectMultiScale(gray, 1.1, 8)
         
         for (x, y, w, h) in faces:
             # Draw rectangle around detected faces
             cv2.rectangle(frame, (x, y), (x+w, y+h), (255, 0, 0), 2)
             
-            roi_gray = gray[y:y+h, x:x+w]
+            roi_gray = gray[y:y+ int(.6 * h), x:x+w]
             
-            eyes = eye_cascade.detectMultiScale(roi_gray)
+            eyes = eye_cascade.detectMultiScale(roi_gray, 1.1, 10)
+            print(eyes)
                 
             for (ex, ey, ew, eh) in eyes:
                 cv2.rectangle(frame, (x+ex, y+ey), (x+ex+ew, y+ey+eh), (0, 255, 0), 2)
