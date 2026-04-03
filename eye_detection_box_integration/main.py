@@ -2,42 +2,112 @@ import cv2
 from picamera2 import Picamera2
 import time
 import numpy as np
+import tkinter as tk
 
-face_cascade = cv2.CascadeClassifier('/home/ece4723inter/Documents/ECE4723_senior_design/facial_recognition/haarcascade_frontalface_default.xml')
-eye_cascade = cv2.CascadeClassifier('/home/ece4723inter/Documents/ECE4723_senior_design/facial_recognition/haarcascade_eye.xml')
+# --- CONFIGURATION ---
+# Monitor Settings
+MONITOR_WIDTH = 1920
+MONITOR_HEIGHT = 1080
+X_OFFSET = 0
+Y_OFFSET = 0  # Set to -1080 if monitor is above laptop
+
+# Detection Settings
+FACE_CASCADE_PATH = '/home/ece4723inter/Documents/ECE4723_senior_design/facial_recognition/haarcascade_frontalface_default.xml'
+EYE_CASCADE_PATH = '/home/ece4723inter/Documents/ECE4723_senior_design/facial_recognition/haarcascade_eye.xml'
+
+# Smoothing & Scaling
+BLOCK_SIZE = 150
+SMOOTHING = 0.6  # 0.0 = instant, 0.9 = very slow/smooth
+avg_x, avg_y = 0, 0
+
+# --- INITIALIZATION ---
+face_cascade = cv2.CascadeClassifier(FACE_CASCADE_PATH)
+eye_cascade = cv2.CascadeClassifier(EYE_CASCADE_PATH)
 
 picam2 = Picamera2()
 config = picam2.create_video_configuration(main={"size": (640, 480)})
 picam2.configure(config)
 picam2.start()
 
-print("Camera warming up in main.py...")
+print("InvisiVisor Initializing...")
 time.sleep(2)
 
-try:
-    while True:
-        frame = picam2.capture_array()
-        
-        gray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
-        
-        faces = face_cascade.detectMultiScale(gray, 1.1, 8)
-        
-        for (x, y, w, h) in faces:
-            cv2.rectangle(frame, (x, y), (x+w, y+h), (255, 0, 0), 2)
-            
-            roi_gray = gray[y:y+ int(.6 * h), x:x+w]
-            
-            eyes = eye_cascade.detectMultiScale(roi_gray, 1.1, 10)
-            print(eyes)
-                
-            for (ex, ey, ew, eh) in eyes:
-                cv2.rectangle(frame, (x+ex, y+ey), (x+ex+ew, y+ey+eh), (0, 255, 0), 2)
+# --- GUI SETUP ---
+root = tk.Tk()
+root.overrideredirect(True)
+root.geometry(f"{MONITOR_WIDTH}x{MONITOR_HEIGHT}+{X_OFFSET}+{Y_OFFSET}")
+root.attributes('-topmost', True)
+root.config(cursor="none", bg="white")
+root.focus_forced()
 
-        cv2.imshow("Face Recognition", frame)
-        
-        if cv2.waitKey(1) & 0xFF == ord('q'):
-            break
+canvas = tk.Canvas(root, highlightthickness=0, bg="white")
+canvas.pack(fill="both", expand=True)
 
-finally:
-    picam2.stop()
-    cv2.destroyAllWindows()
+# Create the glare block
+rect = canvas.create_rectangle(-200, -200, 0, 0, fill="black")
+
+def update_visor():
+    global avg_x, avg_y
+    
+    # 1. Capture Frame
+    frame = picam2.capture_array()
+    gray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
+    
+    # 2. Detect Face
+    faces = face_cascade.detectMultiScale(gray, 1.1, 8)
+    
+    found_eye = False
+    for (x, y, w, h) in faces:
+        # Look for eyes in the top 60% of the face
+        roi_gray = gray[y:y+int(0.6*h), x:x+w]
+        eyes = eye_cascade.detectMultiScale(roi_gray, 1.1, 10)
+        
+        if len(eyes) > 0:
+            # Get the first eye detected
+            ex, ey, ew, eh = eyes[0]
+            
+            # Target coordinates in the 640x480 camera space
+            target_x = x + ex + (ew // 2)
+            target_y = y + ey + (eh // 2)
+            
+            # --- COORDINATE MAPPING ---
+            # Map 640x480 (Camera) -> 1920x1080 (LCD)
+            # Note: You may need to invert X if the camera is facing you (mirroring)
+            mapped_x = (target_x / 640) * MONITOR_WIDTH
+            mapped_y = (target_y / 480) * MONITOR_HEIGHT
+            
+            # --- SMOOTHING ---
+            avg_x = (avg_x * SMOOTHING) + (mapped_x * (1 - SMOOTHING))
+            avg_y = (avg_y * SMOOTHING) + (mapped_y * (1 - SMOOTHING))
+            found_eye = True
+            break # Only track one set of eyes for the visor
+
+    # 3. Update GUI
+    if found_eye:
+        x1 = avg_x - (BLOCK_SIZE / 2)
+        y1 = avg_y - (BLOCK_SIZE / 2)
+        x2 = avg_x + (BLOCK_SIZE / 2)
+        y2 = avg_y + (BLOCK_SIZE / 2)
+        canvas.coords(rect, x1, y1, x2, y2)
+    else:
+        # Optional: Hide the block if no eyes are detected
+        # canvas.coords(rect, -200, -200, -200, -200)
+        pass
+
+    # Optional: Show the camera preview for debugging
+    # cv2.imshow("Debug View", frame)
+    # cv2.waitKey(1)
+
+    # 4. Schedule the next update (approx 30 FPS)
+    root.after(10, update_visor)
+
+# Key Bindings
+root.bind('<Escape>', lambda e: root.destroy())
+
+# Start the loop
+root.after(10, update_visor)
+root.mainloop()
+
+# Cleanup after window closes
+picam2.stop()
+cv2.destroyAllWindows()
