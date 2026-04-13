@@ -17,9 +17,9 @@ picam2.start()
 # display settings
 CAM_DISPLAY_W, CAM_DISPLAY_H = 640, 480
 # uncomment the below once second display is connected
-SUN_DISPLAY_W, SUN_DISPLAY_H = 640, 480
-# SECOND_SCREEN_X = 1920
-# SECOND_SCREEN_Y = 0
+SUN_DISPLAY_W, SUN_DISPLAY_H = 2560, 1600
+SECOND_SCREEN_X = 1920
+SECOND_SCREEN_Y = 0
 
 # 3. Load your reference image
 # Note: Ensure 'your_face_image.jpg' exists in the same folder
@@ -35,8 +35,8 @@ cv2.namedWindow("camera feed", cv2.WINDOW_NORMAL)
 cv2.moveWindow("camera feed", 0, 0)
 # uncomment when 2nd display is connected
 cv2.namedWindow("Sun Blocker", cv2.WINDOW_NORMAL)
-cv2.moveWindow("Sun Blocker", CAM_DISPLAY_W + 10, 0) # edit for 2nd display
-# cv2.setWindowProperty("Sun Blocker", cv2.WND_PROP_FULLSCREEN, cv2.WINDOW_FULLSCREEN)
+cv2.moveWindow("Sun Blocker", SECOND_SCREEN_X, SECOND_SCREEN_Y) # edit for 2nd display
+cv2.setWindowProperty("Sun Blocker", cv2.WND_PROP_FULLSCREEN, cv2.WINDOW_FULLSCREEN)
 
 #def draw_box(frame, eye_coords):
  #   if len(eye_coords) == 0:
@@ -77,7 +77,7 @@ try:
     while True:
         # Capture a frame directly as a NumPy array (OpenCV format)
         frame = picam2.capture_array()
-        frame = cv2.rotate(frame, cv2.ROTATE_180)
+        frame = cv2.flip(frame, -1)
         
         # Convert the frame to grayscale for face detection
         gray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
@@ -119,10 +119,16 @@ try:
                 cv2.rectangle(frame, (bx1,by1), (bx2, by2), (0, 255, 0), 2)
                 
                 # check prompt for code for second display to add here!!!
-                cv2.rectangle(white_screen, (bx1, by1), (bx2, by2), (0, 0, 0), thickness=-1)
+                scale_x = SUN_DISPLAY_W / CAM_DISPLAY_W
+                scale_y = SUN_DISPLAY_H / CAM_DISPLAY_H
+                sx1 = int(bx1 * scale_x)
+                sy1 = int(by1 * scale_y)
+                sx2 = int(bx2 * scale_x)
+                sy2 = int(by2 * scale_y)
+                cv2.rectangle(white_screen, (SUN_DISPLAY_W - sx2, sy1), (SUN_DISPLAY_W - sx1, sy2), (0, 0, 0), thickness=-1)
             
         # Display the resulting frame
-        cv2.imshow("Camera Feed", frame)
+        cv2.imshow("camera feed", frame)
         # for 2nd display:
         cv2.imshow("Sun Blocker", white_screen)
         
