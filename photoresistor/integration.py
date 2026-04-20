@@ -8,16 +8,17 @@ import sys
 # --- HARDWARE CONFIGURATION (GPIO) ---
 PIN_TO_CIRCUIT = 7
 GLARE_THRESHOLD = 500  # ADJUST THIS: Lower count = more light. 
-# If rc_time(PIN_TO_CIRCUIT) < GLARE_THRESHOLD, we darken the pixels.
+LIGHT_CHECK_INTERVAL = 2.0 # Only check light every 2 seconds to prevent lag
 
 GPIO.setmode(GPIO.BOARD)
 
 def rc_time(pin):
+    # This function is now faster because the sleep happens outside the main loop logic
     count = 0
     # Discharge the capacitor
     GPIO.setup(pin, GPIO.OUT)
     GPIO.output(pin, GPIO.LOW)
-    time.sleep(0.1)
+    time.sleep(0.01) # Reduced from 0.1 to 0.01 for faster polling
     # Switch to input and time how long it takes to go HIGH
     GPIO.setup(pin, GPIO.IN)
     while (GPIO.input(pin) == GPIO.LOW):
@@ -52,15 +53,21 @@ cv2.moveWindow("Sun Blocker", SECOND_SCREEN_X, SECOND_SCREEN_Y)
 cv2.setWindowProperty("Sun Blocker", cv2.WND_PROP_FULLSCREEN, cv2.WINDOW_FULLSCREEN)
 
 last_box = None
+is_glare_detected = False
+last_light_check = 0
 
 try:
     while True:
-        # 1. Read Light Level
-        light_count = rc_time(PIN_TO_CIRCUIT)
-        is_glare_detected = light_count < GLARE_THRESHOLD
-        print(f"Light Level: {light_count} | Glare: {is_glare_detected}", end='\r')
+        # 1. Non-blocking Light Level Check
+        # Only runs the slow rc_time function once every few seconds
+        current_time = time.time()
+        if current_time - last_light_check > LIGHT_CHECK_INTERVAL:
+            light_count = rc_time(PIN_TO_CIRCUIT)
+            is_glare_detected = light_count < GLARE_THRESHOLD
+            last_light_check = current_time
+            print(f"\nLight Sensor Updated: {light_count} | Glare: {is_glare_detected}")
 
-        # 2. Capture and Process Frame
+        # 2. Capture and Process Frame (Now runs at full speed)
         frame = picam2.capture_array()
         frame = cv2.flip(frame, -1)
         gray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
@@ -79,13 +86,13 @@ try:
             
             eyes_in_frame = [(x + ex, y + ey, ew, eh) for (ex, ey, ew, eh) in eyes]
             
-            if len(eyes_in_frame) >= 1: # Tracking even if one eye is found for stability
+            if len(eyes_in_frame) >= 1: 
                 ex1 = min(ex for (ex, ey, ew, eh) in eyes_in_frame)
                 ey1 = min(ey for (ex, ey, ew, eh) in eyes_in_frame)
                 ex2 = max(ex + ew for (ex, ey, ew, eh) in eyes_in_frame)
                 ey2 = max(ey + eh for (ex, ey, ew, eh) in eyes_in_frame)
                 
-                PAD_X, PAD_Y = 20, 10 # Slightly larger padding for better coverage
+                PAD_X, PAD_Y = 20, 10 
                 last_box = (
                     max(ex1 - PAD_X, 0),
                     max(ey1 - PAD_Y, 0),
@@ -106,8 +113,6 @@ try:
                     sx2 = int(bx2 * scale_x)
                     sy2 = int(by2 * scale_y)
                     
-                    # Draw the actual blackout block on the visor
-                    # Use Mirroring logic for driver perspective
                     cv2.rectangle(white_screen, 
                                  (SUN_W - sx2, sy1), 
                                  (SUN_W - sx1, sy2), 
