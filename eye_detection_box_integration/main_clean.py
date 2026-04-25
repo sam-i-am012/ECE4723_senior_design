@@ -74,12 +74,21 @@ try:
                 sy1 = int(by1 * scale_y)
                 sx2 = int(bx2 * scale_x)
                 sy2 = int(by2 * scale_y)
+                
+                # scaling code
+                cx = (sx1 + sx2) // 2
+                cy = (sy1 + sy2) // 2
+                half_w = int((sx2 - sx1) * 2.5 / 2)
+                half_h = int((sy2 - sy1) * 2.5 / 2)
+                sx1 = max(cx - half_w, 0)
+                sy1 = max(cy - half_h, 0)
+                sx2 = min(cx + half_w, SUN_DISPLAY_W)
+                sy2 = min(cy + half_h, SUN_DISPLAY_H)
                 cv2.rectangle(white_screen, (SUN_DISPLAY_W - sx2, sy1), (SUN_DISPLAY_W - sx1, sy2), (0, 0, 0), thickness=-1)
             
         cv2.imshow("camera feed", frame)
         # for 2nd display:
         cv2.imshow("Sun Blocker", white_screen)
-        
         # Break the loop if 'q' is pressed
         if cv2.waitKey(1) & 0xFF == ord('q'):
             break
